@@ -115,22 +115,22 @@ static void uninit_context(chromakey_context_t *context)
 	switch_chromakey_destroy(&context->ck);
 }
 
-static int flush_video_queue(switch_queue_t *q, int min)
-{
-	void *pop;
+// static int flush_video_queue(switch_queue_t *q, int min)
+// {
+// 	void *pop;
 
-	if (switch_queue_size(q) > min) {
-		while (switch_queue_trypop(q, &pop) == SWITCH_STATUS_SUCCESS) {
-			switch_image_t *img = (switch_image_t *) pop;
-			switch_img_free(&img);
-			if (min && switch_queue_size(q) <= min) {
-				break;
-			}
-		}
-	}
+// 	if (switch_queue_size(q) > min) {
+// 		while (switch_queue_trypop(q, &pop) == SWITCH_STATUS_SUCCESS) {
+// 			switch_image_t *img = (switch_image_t *) pop;
+// 			switch_img_free(&img);
+// 			if (min && switch_queue_size(q) <= min) {
+// 				break;
+// 			}
+// 		}
+// 	}
 
-	return switch_queue_size(q);
-}
+// 	return switch_queue_size(q);
+// }
 
 static switch_bool_t chromakey_child_bug_callback(switch_media_bug_t *bug, void *user_data, switch_abc_type_t type)
 {
@@ -391,268 +391,82 @@ static void parse_params(chromakey_context_t *context, int start, int argc, char
 
 }
 
+
+//TODO: MODIFY HERE
 static switch_status_t video_thread_callback(switch_core_session_t *session, switch_frame_t *frame, void *user_data)
 {
-	chromakey_context_t *context = (chromakey_context_t *)user_data;
-	switch_channel_t *channel = switch_core_session_get_channel(session);
-	switch_image_t *img = NULL;
-	switch_size_t bytes;
-	void *patch_data;
+    chromakey_context_t *context = (chromakey_context_t *)user_data;
+    switch_channel_t *channel = switch_core_session_get_channel(session);
+    switch_image_t *img = NULL;
+    switch_size_t bytes;
+    void *patch_data;
 
-	if (!switch_channel_ready(channel)) {
-		return SWITCH_STATUS_FALSE;
-	}
+    if (!switch_channel_ready(channel)) {
+        return SWITCH_STATUS_FALSE;
+    }
 
-	if (!frame->img) {
-		return SWITCH_STATUS_SUCCESS;
-	}
+    if (!frame->img) {
+        return SWITCH_STATUS_SUCCESS;
+    }
 
-	if (!context->patch && context->mod && !switch_test_flag(frame, SFF_IS_KEYFRAME)) {
-		switch_core_session_request_video_refresh(context->session);
-		return SWITCH_STATUS_SUCCESS;
-	}
+    if (!context->patch && context->mod && !switch_test_flag(frame, SFF_IS_KEYFRAME)) {
+        switch_core_session_request_video_refresh(context->session);
+        return SWITCH_STATUS_SUCCESS;
+    }
 
-	context->mod = 0;
+    context->mod = 0;
 
-	if (switch_mutex_trylock(context->command_mutex) != SWITCH_STATUS_SUCCESS) {
-		switch_image_t *last_img = switch_chromakey_cache_image(context->ck);
+    if (switch_mutex_trylock(context->command_mutex) != SWITCH_STATUS_SUCCESS) {
+        switch_image_t *last_img = switch_chromakey_cache_image(context->ck);
 
-		if (last_img) {
-			switch_img_patch(frame->img, last_img, 0, 0);
-		}
+        if (last_img) {
+            switch_img_patch(frame->img, last_img, 0, 0);
+        }
 
-		return SWITCH_STATUS_SUCCESS;
-	}
+        return SWITCH_STATUS_SUCCESS;
+    }
 
-	bytes = frame->img->d_w * frame->img->d_h * 4;
+    bytes = frame->img->d_w * frame->img->d_h * 4;
 
-	if (bytes > context->datalen) {
-		context->data = realloc(context->data, bytes);
-		context->datalen = bytes;
-	}
-	
-	switch_assert(context->data);
+    if (bytes > context->datalen) {
+        context->data = realloc(context->data, bytes);
+        context->datalen = bytes;
+    }
 
-	patch_data = context->data;
+    switch_assert(context->data);
 
-	if (context->video_filters & SCV_FILTER_8BIT_FG) {
-		switch_image_t *tmp = NULL;
-		int w = frame->img->d_w, h = frame->img->d_h;
+    patch_data = context->data;
 
-		switch_img_scale(frame->img, &tmp, w/8 ,h/8);
-		switch_img_scale(tmp, &frame->img, w,h);
-		switch_img_8bit(frame->img);
-	}
+    switch_img_to_raw(frame->img, context->data, frame->img->d_w * 4, SWITCH_IMG_FMT_ARGB);
+    img = switch_img_wrap(NULL, SWITCH_IMG_FMT_ARGB, frame->img->d_w, frame->img->d_h, 1, context->data);
 
+    switch_assert(img);
 
-	switch_img_to_raw(frame->img, context->data, frame->img->d_w * 4, SWITCH_IMG_FMT_ARGB);
-	img = switch_img_wrap(NULL, SWITCH_IMG_FMT_ARGB, frame->img->d_w, frame->img->d_h, 1, context->data);
+    // Convert to sepia
+    switch_img_sepia(img, 0, 0, img->d_w, img->d_h);
 
+    // XOR operation on the image data
+    // for (int i = 0; i < img->d_h; ++i) {
+    //     for (int j = 0; j < img->d_w; ++j) {
+    //         unsigned char *pixel = &img->planes[SWITCH_PLANE_PACKED][i * img->stride[SWITCH_PLANE_PACKED] + j * 4];
+    //         // XOR each color component (ARGB format)
+    //         pixel[0] ^= 255; // alpha
+    //         pixel[1] ^= 255; // red
+    //         pixel[2] ^= 255; // green
+    //         pixel[3] ^= 255; // blue
+    //     }
+    // }
 
-	switch_assert(img);
-	switch_chromakey_process(context->ck, img);
+    // Convert back to ARGB format
+    switch_img_from_raw(&frame->img, patch_data, SWITCH_IMG_FMT_ARGB, frame->img->d_w, frame->img->d_h);
 
-	if (context->video_filters & SCV_FILTER_GRAY_FG) {
-		switch_img_gray(img, 0, 0, img->d_w, img->d_h);
-	}
+    switch_img_free(&img);
 
-	if (context->video_filters & SCV_FILTER_SEPIA_FG) {
-		switch_img_sepia(img, 0, 0, img->d_w, img->d_h);
-	}
+    switch_mutex_unlock(context->command_mutex);
 
-	
-	if (context->bgimg) {
-		switch_image_t *tmp = NULL;
-
-		if (context->bgimg_scaled && (context->bgimg_scaled->d_w != frame->img->d_w || context->bgimg_scaled->d_h != frame->img->d_h)) {
-			switch_img_free(&context->bgimg_scaled);
-		}
-		
-		if (!context->bgimg_scaled) {
-			switch_img_scale(context->bgimg, &context->bgimg_scaled, frame->img->d_w, frame->img->d_h);
-		}
-
-		if (context->imgbg) {
-			switch_img_copy(img, &tmp);
-		}
-
-		switch_img_patch_rgb(img, context->bgimg_scaled, 0, 0, SWITCH_TRUE);
-
-		if (context->imgbg) {
-			int x = 0, y = 0;
-			
-			if (context->imgbg->d_w != frame->img->d_w && context->imgbg->d_h != frame->img->d_h) {
-				switch_img_fit(&context->imgbg, frame->img->d_w, frame->img->d_h, SWITCH_FIT_SIZE);
-			}
-			
-			switch_img_find_position(POS_CENTER_BOT, frame->img->d_w, frame->img->d_h, context->imgbg->d_w, context->imgbg->d_h, &x, &y);
-			switch_img_patch(img, context->imgbg, x, y);
-
-			if (tmp) {
-				switch_img_patch(img, tmp, 0, 0);
-				switch_img_free(&tmp);
-			}
-		}
-
-	} else if (switch_test_flag(&context->vfh, SWITCH_FILE_OPEN) || !zstr(context->child_uuid)) {
-		switch_image_t *use_img = NULL;
-		switch_frame_t file_frame = { 0 };
-		switch_status_t status;
-
-		context->vfh.mm.scale_w = frame->img->d_w;
-		context->vfh.mm.scale_h = frame->img->d_h;
-
-		if (!zstr(context->child_uuid)) {
-			void *pop = NULL;
-
-			flush_video_queue(context->child_queue, 1);
-
-			if ((status = switch_queue_trypop(context->child_queue, &pop)) == SWITCH_STATUS_SUCCESS && pop) {
-				file_frame.img = (switch_image_t *) pop;
-
-				if (file_frame.img->d_w != context->vfh.mm.scale_w || file_frame.img->d_h != context->vfh.mm.scale_h) {
-					switch_img_fit(&file_frame.img, context->vfh.mm.scale_w, context->vfh.mm.scale_h, SWITCH_FIT_SIZE_AND_SCALE);
-					if (file_frame.img->d_w != context->vfh.mm.scale_w || file_frame.img->d_h != context->vfh.mm.scale_h) {
-						switch_img_free(&file_frame.img);
-					}
-				}
-			}
-			
-		} else {
-			status = switch_core_file_read_video(&context->vfh, &file_frame, SVR_FLUSH);
-			switch_core_file_command(&context->vfh, SCFC_FLUSH_AUDIO);
-		}
-
-		if (file_frame.img) {
-			switch_img_free(&context->bgimg_scaled);
-			use_img = context->bgimg_scaled = file_frame.img;
-
-			if (context->video_filters & SCV_FILTER_SEPIA_BG) {
-				switch_img_sepia(use_img, 0, 0, use_img->d_w, use_img->d_h);
-			}
-			
-			if (context->video_filters & SCV_FILTER_GRAY_BG) {
-				switch_img_sepia(use_img, 0, 0, use_img->d_w, use_img->d_h);
-			}
-
-		} else {
-			use_img = context->bgimg_scaled;
-		}
-
-		if (use_img) {
-			switch_image_t *i2;
-
-			bytes = use_img->d_w * use_img->d_h * 4;
-
-			if (bytes > context->patch_datalen) {
-				context->patch_data = realloc(context->patch_data, bytes);
-				context->patch_datalen = bytes;
-			}
-
-			switch_img_to_raw(use_img, context->patch_data, use_img->d_w * 4, SWITCH_IMG_FMT_ARGB);
-			i2 = switch_img_wrap(NULL, SWITCH_IMG_FMT_ARGB, use_img->d_w, use_img->d_h, 1, context->patch_data);
-
-
-
-			if (context->imgbg) {
-				int x = 0, y = 0;
-				
-				if (context->imgbg->d_w != frame->img->d_w && context->imgbg->d_h != frame->img->d_h) {
-					switch_img_fit(&context->imgbg, frame->img->d_w, frame->img->d_h, SWITCH_FIT_SIZE);
-				}
-				switch_img_find_position(POS_CENTER_BOT, frame->img->d_w, frame->img->d_h, context->imgbg->d_w, context->imgbg->d_h, &x, &y);
-				switch_img_patch(i2, context->imgbg, x, y);
-			}
-
-			switch_img_patch(i2, img, 0, 0);
-			switch_img_free(&img);
-			img = i2;
-			patch_data = context->patch_data;
-		}
-
-		if (status != SWITCH_STATUS_SUCCESS && status != SWITCH_STATUS_BREAK) {
-			int close = 1;
-
-			if (context->vfh.params) {
-				const char *loopstr = switch_event_get_header(context->vfh.params, "loop");
-
-				if (switch_true(loopstr)) {
-					uint32_t pos = 0;
-					switch_core_file_seek(&context->vfh, &pos, 0, SEEK_SET);
-					close = 0;
-				}
-			}
-
-			if (close) {
-				switch_core_file_close(&context->vfh);
-			}
-		}
-
-
-	} else {
-		switch_img_fill_noalpha(img, 0, 0, img->d_w, img->d_h, &context->bgcolor);
-	}
-
-	if (context->imgfg) {
-		int x = 0, y = 0;
-
-		if (context->imgfg->d_w != frame->img->d_w && context->imgfg->d_h != frame->img->d_h) {
-			switch_img_fit(&context->imgfg, frame->img->d_w, frame->img->d_h, SWITCH_FIT_SIZE);
-		}
-		switch_img_find_position(POS_CENTER_BOT, frame->img->d_w, frame->img->d_h, context->imgfg->d_w, context->imgfg->d_h, &x, &y);
-		switch_img_patch(img, context->imgfg, x, y);
-	}
-	
-	if (switch_test_flag(&context->fg_vfh, SWITCH_FILE_OPEN)) {
-		switch_frame_t file_frame = { 0 };
-		switch_status_t status;
-		switch_image_t *use_img = NULL;
-
-		context->fg_vfh.mm.scale_w = frame->img->d_w;
-		context->fg_vfh.mm.scale_h = frame->img->d_h;
-
-		status = switch_core_file_read_video(&context->fg_vfh, &file_frame, SVR_FLUSH);
-		switch_core_file_command(&context->fg_vfh, SCFC_FLUSH_AUDIO);
-
-		if (status != SWITCH_STATUS_SUCCESS && status != SWITCH_STATUS_BREAK) {
-			int close = 1;
-
-			if (context->fg_vfh.params) {
-				const char *loopstr = switch_event_get_header(context->fg_vfh.params, "loop");
-				if (switch_true(loopstr)) {
-					uint32_t pos = 0;
-					switch_core_file_seek(&context->fg_vfh, &pos, 0, SEEK_SET);
-					close = 0;
-				}
-			}
-
-			if (close) {
-				switch_core_file_close(&context->fg_vfh);
-			}
-		}
-
-		if (file_frame.img) {
-			switch_img_free(&context->fgimg_scaled);
-			use_img = context->fgimg_scaled = file_frame.img;
-		} else {
-			use_img = context->fgimg_scaled;
-		}
-		
-		if (use_img) {
-			switch_img_patch(img, use_img, 0, 0);
-		}
-
-	}
-
-
-	switch_img_from_raw(&frame->img, patch_data, SWITCH_IMG_FMT_ARGB, frame->img->d_w, frame->img->d_h);
-
-	switch_img_free(&img);
-
-	switch_mutex_unlock(context->command_mutex);
-
-	return SWITCH_STATUS_SUCCESS;
+    return SWITCH_STATUS_SUCCESS;
 }
+
 
 static switch_bool_t chromakey_bug_callback(switch_media_bug_t *bug, void *user_data, switch_abc_type_t type)
 {

@@ -17,7 +17,7 @@ old_library=''
 inherited_linker_flags=' -pthread'
 
 # Libraries that this one depends upon.
-dependency_libs=' /home/mmccadmin/freeswitch/libfreeswitch.la -L/usr/local/lib -luuid /usr/lib/gcc/x86_64-linux-gnu/9/../../../x86_64-linux-gnu/libsqlite3.la /usr/lib/gcc/x86_64-linux-gnu/9/../../../x86_64-linux-gnu/libcurl.la -lpcre -lspeex -lspeexdsp -ledit -ldl -lcrypt -lrt /usr/local/lib/libspandsp.la -lm -ltiff -ljpeg /usr/local/lib/libsofia-sip-ua.la -lz -lpthread -lssl -lcrypto'
+dependency_libs=' /home/mmccadmin/freeswitch/libfreeswitch.la -L/usr/local/lib -luuid /usr/lib/gcc/x86_64-linux-gnu/9/../../../x86_64-linux-gnu/libsqlite3.la /usr/lib/gcc/x86_64-linux-gnu/9/../../../x86_64-linux-gnu/libcurl.la -lpcre -lspeex -lspeexdsp -ledit -ldl -lcrypt -lrt /usr/local/lib/libspandsp.la -ltiff -ljpeg /usr/local/lib/libsofia-sip-ua.la -lpthread /usr/local/lib/libpng16.la -lm -lz -lssl -lcrypto'
 
 # Names of additional weak libraries provided by this library
 weak_library_names=''
@@ -39,4 +39,4 @@ dlpreopen=''
 
 # Directory that this library needs to be installed in:
 libdir='/usr/local/freeswitch/mod'
-relink_command="(cd /home/mmccadmin/freeswitch/src/mod/applications/mod_video_filter; /bin/bash \"/home/mmccadmin/freeswitch/libtool\"  --silent --tag CC --mode=relink gcc -I/usr/include/uuid -I/home/mmccadmin/freeswitch/src/include -I/home/mmccadmin/freeswitch/src/include -I/home/mmccadmin/freeswitch/libs/libteletone/src -fPIC -ffast-math -Werror -Wno-unused-result -Wno-misleading-indentation -fvisibility=hidden -DSWITCH_API_VISIBILITY=1 -DCJSON_API_VISIBILITY=1 -DHAVE_VISIBILITY=1 -g -ggdb -DHAVE_OPENSSL -Wall -std=c99 -pedantic -Wdeclaration-after-statement -ggdb3 -O0 -avoid-version -module -no-undefined -shared -lm -lz -o mod_video_filter.la -rpath /usr/local/freeswitch/mod mod_video_filter_la-mod_video_filter.lo /home/mmccadmin/freeswitch/libfreeswitch.la -lssl -lcrypto @inst_prefix_dir@)"
+relink_command="(cd /home/mmccadmin/freeswitch/src/mod/applications/mod_video_filter; /bin/bash \"/home/mmccadmin/freeswitch/libtool\"  --silent --tag CC --mode=relink gcc -I/usr/include/uuid -I/home/mmccadmin/freeswitch/src/include -I/home/mmccadmin/freeswitch/src/include -I/home/mmccadmin/freeswitch/libs/libteletone/src -fPIC -ffast-math -Werror -Wno-unused-result -Wno-misleading-indentation -fvisibility=hidden -DSWITCH_API_VISIBILITY=1 -DCJSON_API_VISIBILITY=1 -DHAVE_VISIBILITY=1 -g -ggdb -DHAVE_OPENSSL -Wall -std=c99 -pedantic -Wdeclaration-after-statement -g -O2 -avoid-version -module -no-undefined -shared -lm -lz -o mod_video_filter.la -rpath /usr/local/freeswitch/mod mod_video_filter_la-mod_video_filter.lo /home/mmccadmin/freeswitch/libfreeswitch.la -lssl -lcrypto @inst_prefix_dir@)"

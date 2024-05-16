@@ -17,7 +17,7 @@ old_library=''
 inherited_linker_flags=' -pthread'
 
 # Libraries that this one depends upon.
-dependency_libs=' /usr/local/freeswitch/lib/libfreeswitch.la -L/usr/local/lib -luuid /usr/lib/x86_64-linux-gnu/libsqlite3.la /usr/lib/x86_64-linux-gnu/libcurl.la -lpcre -lspeex -lspeexdsp -ledit -ldl -lcrypt -lrt /usr/local/lib/libspandsp.la -lm -ltiff -ljpeg /usr/local/lib/libsofia-sip-ua.la -lz -lpthread -lssl -lcrypto'
+dependency_libs=' /usr/local/freeswitch/lib/libfreeswitch.la -L/usr/local/lib -luuid /usr/lib/x86_64-linux-gnu/libsqlite3.la /usr/lib/x86_64-linux-gnu/libcurl.la -lpcre -lspeex -lspeexdsp -ledit -ldl -lcrypt -lrt /usr/local/lib/libspandsp.la -ltiff -ljpeg /usr/local/lib/libsofia-sip-ua.la -lpthread /usr/local/lib/libpng16.la -lm -lz -lssl -lcrypto'
 
 # Names of additional weak libraries provided by this library
 weak_library_names=''
